@@ -19,18 +19,23 @@ import com.mrousavy.camera.frameprocessors.FrameProcessorPlugin
 import com.mrousavy.camera.frameprocessors.VisionCameraProxy
 
 class VisionCameraV3TextRecognitionModule(proxy : VisionCameraProxy, options: Map<String, Any>?): FrameProcessorPlugin() {
+  private var recognizer: TextRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+  private var language = options?.get("language").toString()
+
+  init {
+    recognizer = when (language) {
+      "latin" -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+      "chinese" -> TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
+      "devanagari" -> TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().build())
+      "japanese" -> TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
+      "korean" -> TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
+      else -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
+  }
   override fun callback(frame: Frame, arguments: Map<String, Any>?): Any {
       try {
         val mediaImage: Image = frame.image
         val image = InputImage.fromMediaImage(mediaImage, frame.imageProxy.imageInfo.rotationDegrees)
-        val recognizer : TextRecognizer = when (arguments?.get("language")) {
-          "latin" -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-          "chinese" -> TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
-          "devanagari" -> TextRecognition.getClient(DevanagariTextRecognizerOptions.Builder().build())
-          "japanese" -> TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
-          "korean" -> TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build())
-          else -> TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-        }
         val task: Task<Text> = recognizer.process(image)
         val result: Text? = Tasks.await(task)
         val array = WritableNativeArray()

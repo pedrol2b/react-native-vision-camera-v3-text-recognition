@@ -1,29 +1,37 @@
-import React, { forwardRef, type ForwardedRef } from 'react';
+import React, { forwardRef, type ForwardedRef, useMemo } from 'react';
 import {
   Camera as VisionCamera,
   useFrameProcessor,
 } from 'react-native-vision-camera';
-import { useRunInJS } from 'react-native-worklets-core';
-import { scanText } from './scanText';
-import type { CameraTypes, Frame, ReadonlyFrameProcessor, TextDataMap } from './types';
-
-export { scanText } from './scanText';
-export type { TextData, TextDataMap } from './types';
+import { createTextRecognitionPlugin } from './scanText';
+import { useRunOnJS } from 'react-native-worklets-core';
+import type {
+  CameraTypes,
+  Frame,
+  ReadonlyFrameProcessor,
+  TextRecognitionOptions,
+  TextRecognitionPlugin,
+  Text,
+} from './types';
 
 export const Camera = forwardRef(function Camera(
   props: CameraTypes,
   ref: ForwardedRef<any>
 ) {
-  const { callback, device, options } = props;
+  const { device, callback, options = {}, ...p } = props;
   // @ts-ignore
-  const useWorklets = useRunInJS((data: TextDataMap): void => {
-    callback(data);
-  }, []);
+  const { scanText } = useTextRecognition(options);
+  const useWorklets = useRunOnJS(
+    (data: Text): void => {
+      callback(data);
+    },
+    [options]
+  );
   const frameProcessor: ReadonlyFrameProcessor = useFrameProcessor(
-    (frame: Frame): void => {
+    (frame: Frame) => {
       'worklet';
-      // @ts-ignore
-      const data = scanText(frame, options);
+      const data: Text = scanText(frame);
+      console.log(data, 666);
       // @ts-ignore
       // eslint-disable-next-line react-hooks/rules-of-hooks
       useWorklets(data);
@@ -31,8 +39,25 @@ export const Camera = forwardRef(function Camera(
     []
   );
   return (
-    !!device && (
-      <VisionCamera ref={ref} frameProcessor={frameProcessor} {...props} />
-    )
+    <>
+      {!!device && (
+        <VisionCamera
+          pixelFormat="yuv"
+          ref={ref}
+          frameProcessor={frameProcessor}
+          device={device}
+          {...p}
+        />
+      )}
+    </>
   );
 });
+
+export function useTextRecognition(
+  options?: TextRecognitionOptions
+): TextRecognitionPlugin {
+  return useMemo(
+    () => createTextRecognitionPlugin(options || { language: 'latin' }),
+    [options]
+  );
+}
